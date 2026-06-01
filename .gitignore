@@ -47,3 +47,4 @@ clinvar.csv
 *.log
 *fdb_latexmk
 *.fls
+*.gz

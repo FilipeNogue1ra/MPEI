@@ -5,7 +5,7 @@
 \usepackage{caption}
 \usepackage{geometry}
 \usepackage{amsmath}
-\geometry{a4paper, margin=2.5cm}
+\geometry{a4paper, margin=2.1cm}
 
 \begin{document}
 
@@ -180,6 +180,8 @@ Treinámos o classificador e testámos a previsão para dois cenários:
 \vspace{0.5cm}
 \noindent\textbf{Resultados e Conclusão} \\
 Para a variante inédita, sem a suavização de Laplace, o produto das verosimilhanças seria nulo ($P(\text{Gene}=\text{BRCA1}|C)=0$), provocando uma falha de cálculo. Com o parâmetro $\alpha = 1$, a verosimilhança fallback foi corretamente calculada e o modelo conseguiu classificar com sucesso a amostra baseando-se nas restantes características da mutação (como a Consequência clínica). Isto comprova a robustez e estabilidade do Naïve Bayes em oncologia para variantes raras.
+
+Além disso, notou-se um grande desequilíbrio nos dados do ClinVar, onde a classe \textit{Likely\_benign} representa a esmagadora maioria dos registos. Esta diferença afeta as decisões do modelo, fazendo com que ele escolha quase sempre a classe com mais exemplos (o que explica a alta taxa de acerto de $87.80\%$ na \textit{Likely\_benign}, enquanto as classes mais raras ficam com $0\%$). Para resolver este problema no futuro, podemos reduzir a quantidade de dados da classe maior (\textit{undersampling}), aumentar os dados das classes mais pequenas (\textit{oversampling}) ou equilibrar as probabilidades iniciais do modelo. Assim, o modelo será mais capaz de detetar as variantes que causam doenças graves.
 
 \subsection*{Análise de Eficiência Temporal}
 Para demonstrar a viabilidade clínica e a escalabilidade do sistema em tempo real, os tempos de execução do treino e da inferência foram medidos com as funções \texttt{tic} e \texttt{toc} do MatLab. O processo completo de treino dos três modelos probabilísticos (sobre 4.000 variantes genómicas) demorou apenas \textbf{0.9665 segundos}. Os tempos médios observados por consulta em fase de inferência estão sumariados na tabela seguinte:
