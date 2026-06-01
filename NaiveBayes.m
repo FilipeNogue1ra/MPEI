@@ -5,10 +5,10 @@ classdef NaiveBayes < handle
 
     properties
         classes
-        featureNames
-        classPriors
-        featureValues
-        likelihoods
+        nomes_atributos
+        probabilidades_priori
+        valores_atributos
+        verosimilhancas
         alpha = 1
     end
 
@@ -19,96 +19,96 @@ classdef NaiveBayes < handle
             end
         end
 
-        function treinar(obj, tabela, targetName, featureNames)
+        function treinar(obj, tabela, nome_alvo, nomes_atributos)
             if nargin < 4
                 error('NaiveBayes requer a tabela, o nome da classe-alvo e as features.');
             end
 
-            obj.featureNames = string(featureNames);
-            targetName = string(targetName);
+            obj.nomes_atributos = string(nomes_atributos);
+            nome_alvo = string(nome_alvo);
 
-            classes = unique(string(tabela.(targetName)));
-            obj.classes = classes;
-            totalRows = height(tabela);
-            obj.classPriors = containers.Map('KeyType', 'char', 'ValueType', 'double');
-            obj.featureValues = containers.Map('KeyType', 'char', 'ValueType', 'any');
-            obj.likelihoods = containers.Map('KeyType', 'char', 'ValueType', 'any');
+            classes_unicas = unique(string(tabela.(nome_alvo)));
+            obj.classes = classes_unicas;
+            total_linhas = height(tabela);
+            obj.probabilidades_priori = containers.Map('KeyType', 'char', 'ValueType', 'double');
+            obj.valores_atributos = containers.Map('KeyType', 'char', 'ValueType', 'any');
+            obj.verosimilhancas = containers.Map('KeyType', 'char', 'ValueType', 'any');
 
-            for c = 1:numel(classes)
-                classValue = classes(c);
-                classMask = string(tabela.(targetName)) == classValue;
-                classTable = tabela(classMask, :);
-                obj.classPriors(char(classValue)) = (height(classTable) + obj.alpha) / (totalRows + obj.alpha * numel(classes));
+            for c = 1:numel(classes_unicas)
+                valor_classe = classes_unicas(c);
+                mascara_classe = string(tabela.(nome_alvo)) == valor_classe;
+                tabela_classe = tabela(mascara_classe, :);
+                obj.probabilidades_priori(char(valor_classe)) = (height(tabela_classe) + obj.alpha) / (total_linhas + obj.alpha * numel(classes_unicas));
 
-                classLikelihoods = containers.Map('KeyType', 'char', 'ValueType', 'any');
-                classFeatureValues = containers.Map('KeyType', 'char', 'ValueType', 'any');
+                verosimilhancas_classe = containers.Map('KeyType', 'char', 'ValueType', 'any');
+                valores_atributos_classe = containers.Map('KeyType', 'char', 'ValueType', 'any');
 
-                for f = 1:numel(obj.featureNames)
-                    featureName = obj.featureNames(f);
-                    values = unique(string(tabela.(featureName)));
-                    values(values == "") = [];
-                    classFeatureValues(char(featureName)) = values;
+                for f = 1:numel(obj.nomes_atributos)
+                    nome_atributo = obj.nomes_atributos(f);
+                    valores = unique(string(tabela.(nome_atributo)));
+                    valores(valores == "") = [];
+                    valores_atributos_classe(char(nome_atributo)) = valores;
 
-                    counts = containers.Map('KeyType', 'char', 'ValueType', 'double');
-                    for v = 1:numel(values)
-                        value = values(v);
-                        count = sum(string(classTable.(featureName)) == value);
-                        numerator = count + obj.alpha;
-                        denominator = height(classTable) + obj.alpha * numel(values);
-                        counts(char(value)) = numerator / denominator;
+                    contagens = containers.Map('KeyType', 'char', 'ValueType', 'double');
+                    for v = 1:numel(valores)
+                        valor = valores(v);
+                        contagem = sum(string(tabela_classe.(nome_atributo)) == valor);
+                        numerador = contagem + obj.alpha;
+                        denominador = height(tabela_classe) + obj.alpha * numel(valores);
+                        contagens(char(valor)) = numerador / denominador;
                     end
-                    classLikelihoods(char(featureName)) = counts;
+                    verosimilhancas_classe(char(nome_atributo)) = contagens;
                 end
 
-                obj.likelihoods(char(classValue)) = classLikelihoods;
-                obj.featureValues(char(classValue)) = classFeatureValues;
+                obj.verosimilhancas(char(valor_classe)) = verosimilhancas_classe;
+                obj.valores_atributos(char(valor_classe)) = valores_atributos_classe;
             end
         end
 
-        function [classePredita, confianca, pontuacoes] = classificar(obj, amostra)
+        function [classe_predita, confianca, pontuacoes] = classificar(obj, amostra)
             if isempty(obj.classes)
                 error('NaiveBayes tem de ser treinado antes de classificar.');
             end
 
             pontuacoes = zeros(1, numel(obj.classes));
-            amostra = ensureRowAsStrings(amostra);
+            amostra = garantir_colunas_como_strings(amostra);
 
             for c = 1:numel(obj.classes)
-                classValue = obj.classes(c);
-                score = log(obj.classPriors(char(classValue)));
-                classLikelihoods = obj.likelihoods(char(classValue));
-                classFeatureValues = obj.featureValues(char(classValue));
+                valor_classe = obj.classes(c);
+                pontuacao = log(obj.probabilidades_priori(char(valor_classe)));
+                verosimilhancas_classe = obj.verosimilhancas(char(valor_classe));
+                valores_atributos_classe = obj.valores_atributos(char(valor_classe));
 
-                for f = 1:numel(obj.featureNames)
-                    featureName = obj.featureNames(f);
-                    featureMap = classLikelihoods(char(featureName));
-                    value = string(amostra.(featureName));
-                    if isKey(featureMap, char(value))
-                        score = score + log(featureMap(char(value)));
+                for f = 1:numel(obj.nomes_atributos)
+                    nome_atributo = obj.nomes_atributos(f);
+                    mapa_atributo = verosimilhancas_classe(char(nome_atributo));
+                    valor = string(amostra.(nome_atributo));
+                    if isKey(mapa_atributo, char(valor))
+                        pontuacao = pontuacao + log(mapa_atributo(char(valor)));
                     else
-                        knownValues = classFeatureValues(char(featureName));
-                        fallback = obj.alpha / (obj.alpha * max(1, numel(knownValues)) + 1);
-                        score = score + log(fallback);
+                        valores_conhecidos = valores_atributos_classe(char(nome_atributo));
+                        alternativa = obj.alpha / (obj.alpha * max(1, numel(valores_conhecidos)) + 1);
+                        pontuacao = pontuacao + log(alternativa);
                     end
                 end
 
-                pontuacoes(c) = score;
+                pontuacoes(c) = pontuacao;
             end
 
-            maxScore = max(pontuacoes);
-            expoentes = exp(pontuacoes - maxScore);
+            max_pontuacao = max(pontuacoes);
+            expoentes = exp(pontuacoes - max_pontuacao);
             probabilidades = expoentes / sum(expoentes);
             [confianca, idx] = max(probabilidades);
-            classePredita = obj.classes(idx);
+            classe_predita = obj.classes(idx);
         end
     end
 end
 
-function amostra = ensureRowAsStrings(amostra)
-    vars = amostra.Properties.VariableNames;
-    for i = 1:numel(vars)
-        if ~isstring(amostra.(vars{i}))
-            amostra.(vars{i}) = string(amostra.(vars{i}));
+function amostra = garantir_colunas_como_strings(amostra)
+    variaveis = amostra.Properties.VariableNames;
+    for i = 1:numel(variaveis)
+        if ~isstring(amostra.(variaveis{i}))
+            amostra.(variaveis{i}) = string(amostra.(variaveis{i}));
         end
     end
 end

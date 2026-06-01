@@ -26,7 +26,8 @@
     
     \vspace{3cm}
     
-    {\Large Nome do Aluno 1 - NMec \par Nome do Aluno 2 - NMec \par}
+    
+    {\Large Filipe Nogueira - 119495 \par João Tomásio - 120132 \par}
     
     \vfill
     
@@ -101,15 +102,19 @@ Nos testes empíricos, os resultados obtidos foram:
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=0.55\textwidth]{fig_bloom_fp_vs_k_new.png}
-  \caption{Taxa de falsos positivos vs. número de funções de hash ($k$) para o filtro de Bloom.}
-  \label{fig:bloom-fp-vs-k}
-\end{figure}
-\begin{figure}[htbp]
-  \centering
-  \includegraphics[width=0.55\textwidth]{fig_bloom_fp_vs_m_new.png}
-  \caption{Taxa de falsos positivos vs. tamanho do filtro ($m$) para o filtro de Bloom.}
-  \label{fig:bloom-fp-vs-m}
+  \begin{minipage}{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{fig_bloom_fp_vs_k_new.png}
+    \caption{Taxa de FP vs. número de hashes $k$.}
+    \label{fig:bloom-fp-vs-k}
+  \end{minipage}
+  \hfill
+  \begin{minipage}{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{fig_bloom_fp_vs_m_new.png}
+    \caption{Taxa de FP vs. tamanho do filtro $m$.}
+    \label{fig:bloom-fp-vs-m}
+  \end{minipage}
 \end{figure}
 
 \noindent\textbf{Conclusão} \\
@@ -130,15 +135,19 @@ Gerámos depois as assinaturas MinHash para as duas strings usando $N = 200$ has
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=0.55\textwidth]{fig_minhash_error_vs_N_new.png}
-  \caption{Erro de estimativa do MinHash em função do número de hashes $N$.}
-  \label{fig:minhash-error-vs-N}
-\end{figure}
-\begin{figure}[htbp]
-  \centering
-  \includegraphics[width=0.55\textwidth]{fig_minhash_k_compare_new.png}
-  \caption{Comparação de desempenho do MinHash para diferentes valores de $k$ (tamanho do shingle).}
-  \label{fig:minhash-k-compare}
+  \begin{minipage}{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{fig_minhash_error_vs_N_new.png}
+    \caption{Erro absoluto médio do MinHash vs. $N$.}
+    \label{fig:minhash-error-vs-N}
+  \end{minipage}
+  \hfill
+  \begin{minipage}{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{fig_minhash_k_compare_new.png}
+    \caption{Correlação: Jaccard Real vs. Estimado.}
+    \label{fig:minhash-k-compare}
+  \end{minipage}
 \end{figure}
 O teste demonstram que a similaridade calculada a partir do vetor de assinaturas compactas do MinHash aproxima-se com elevada precisão do Jaccard real das strings (ex: erro absoluto médio $< 0.02$). O uso de $k_{shingle}=3$ (ou superior) revelou-se ideal para anotações genómicas, pois shingles muito curtos ($k=2$) geram falsas similaridades em palavras curtas do texto clínico.
 
@@ -153,20 +162,45 @@ Treinámos o classificador e testámos a previsão para dois cenários:
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=0.55\textwidth]{fig_nb_accuracy_vs_train_new.png}
-  \caption{Acurácia do classificador Naïve Bayes em função do tamanho de treino.}
-  \label{fig:nb-accuracy-vs-train}
-\end{figure}
-\begin{figure}[htbp]
-  \centering
-  \includegraphics[width=0.55\textwidth]{fig_nb_confusion_new.png}
-  \caption{Matriz de confusão do classificador Naïve Bayes.}
-  \label{fig:nb-confusion}
+  \begin{minipage}{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{fig_nb_accuracy_vs_train_new.png}
+    \caption{Curva de aprendizagem do Naïve Bayes.}
+    \label{fig:nb-accuracy-vs-train}
+  \end{minipage}
+  \hfill
+  \begin{minipage}{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{fig_nb_confusion_new.png}
+    \caption{Matriz de confusão no dataset real.}
+    \label{fig:nb-confusion}
+  \end{minipage}
 \end{figure}
 
 \vspace{0.5cm}
 \noindent\textbf{Resultados e Conclusão} \\
 Para a variante inédita, sem a suavização de Laplace, o produto das verosimilhanças seria nulo ($P(\text{Gene}=\text{BRCA1}|C)=0$), provocando uma falha de cálculo. Com o parâmetro $\alpha = 1$, a verosimilhança fallback foi corretamente calculada e o modelo conseguiu classificar com sucesso a amostra baseando-se nas restantes características da mutação (como a Consequência clínica). Isto comprova a robustez e estabilidade do Naïve Bayes em oncologia para variantes raras.
+
+\subsection*{Análise de Eficiência Temporal}
+Para demonstrar a viabilidade clínica e a escalabilidade do sistema em tempo real, os tempos de execução do treino e da inferência foram medidos com as funções \texttt{tic} e \texttt{toc} do MatLab. O processo completo de treino dos três modelos probabilísticos (sobre 4.000 variantes genómicas) demorou apenas \textbf{0.9665 segundos}. Os tempos médios observados por consulta em fase de inferência estão sumariados na tabela seguinte:
+
+\begin{table}[htbp]
+  \centering
+  \begin{tabular}{|l|r|}
+    \hline
+    \textbf{Componente / Algoritmo} & \textbf{Tempo Médio} \\
+    \hline
+    Treino Total (4.000 registos) & 0.9665 s \\
+    Filtro de Bloom (Triagem de Risco) & 0.0420 ms \\
+    Naïve Bayes (Predição Diagnóstica) & 1.3372 ms \\
+    MinHash (Top 5 Semelhantes em 4.000 do histórico) & 8.8893 ms \\
+    \hline
+  \end{tabular}
+  \caption{Tempos médios de computação das diferentes etapas do pipeline.}
+  \label{tab:tempos}
+\end{table}
+
+A triagem inicial com o Filtro de Bloom oferece uma resposta extremamente rápida (menos de $0.05$ ms), permitindo filtrar variantes comuns instantaneamente. A inferência probabilística com Naïve Bayes e a busca de histórico com MinHash demoram respetivamente $1.3$ ms e $8.9$ ms, comprovando a elevada eficiência e adequação do sistema para contextos de diagnóstico oncológico em tempo real.
 
 \section*{Conclusão}
 Este projeto consolidou a aplicação prática de métodos probabilísticos em problemas complexos da área da saúde. A implementação demonstrou a eficácia da combinação entre algoritmos de eficiência (Bloom e MinHash) e de inferência estatística (Naïve Bayes). A avaliação experimental validou a precisão dos modelos sob condições controladas, destacando a importância da suavização de Laplace e do ajuste de parâmetros de hashing para garantir resultados fidedignos em contextos oncológicos.

@@ -1,79 +1,75 @@
 % Constrói o perfil textual da variante.
-% O perfil segue a estrutura: Gene, Cromossoma, REF, ALT e Consequence.
+function texto_variante = build_clinvar_variant_string(linha)
 
-function variantText = build_clinvar_variant_string(row)
-
-    if ~istable(row) || height(row) ~= 1
+    if ~istable(linha) || height(linha) ~= 1
         error('build_clinvar_variant_string espera uma tabela com uma única linha.');
     end
 
-    variantText = strjoin(collectTokens(row), " ");
+    texto_variante = strjoin(obter_tokens(linha), " ");
 end
 
-function tokens = collectTokens(row)
+function tokens = obter_tokens(linha)
     tokens = strings(0, 1);
-    variableNames = string(row.Properties.VariableNames);
+    nomes_variaveis = string(linha.Properties.VariableNames);
 
-    geneCol = findColumnName(variableNames, ["GENE", "Gene"]);
-    chromCol = findColumnName(variableNames, ["CHROM", "Chrom", "chrom"]);
-    refCol = findColumnName(variableNames, ["REF", "Ref", "ref"]);
-    altCol = findColumnName(variableNames, ["ALT", "Alt", "alt"]);
-    infoCol = findColumnName(variableNames, ["INFO", "Info", "info"]);
+    col_gene = procurar_nome_coluna(nomes_variaveis, ["GENE", "Gene"]);
+    col_chrom = procurar_nome_coluna(nomes_variaveis, ["CHROM", "Chrom", "chrom"]);
+    col_ref = procurar_nome_coluna(nomes_variaveis, ["REF", "Ref", "ref"]);
+    col_alt = procurar_nome_coluna(nomes_variaveis, ["ALT", "Alt", "alt"]);
+    col_info = procurar_nome_coluna(nomes_variaveis, ["INFO", "Info", "info"]);
 
     gene = "";
-    consequence = "";
+    consequencia = "";
 
-    if strlength(geneCol) > 0
-        gene = normalizeToken(row.(geneCol));
+    if strlength(col_gene) > 0
+        gene = normalizeToken(linha.(col_gene));
     end
 
-    if strlength(infoCol) > 0
-        [geneFromInfo, consequenceFromInfo] = extrair_campos_clinvar(row.(infoCol));
+    if strlength(col_info) > 0
+        [gene_da_info, consequencia_da_info] = extrair_campos_clinvar(linha.(col_info));
         if strlength(gene) == 0
-            gene = geneFromInfo;
+            gene = gene_da_info;
         end
-        consequence = consequenceFromInfo;
+        consequencia = consequencia_da_info;
     end
 
     if strlength(gene) > 0
-        tokens(end + 1, 1) = "gene:" + gene; %#ok<AGROW>
+        tokens(end + 1, 1) = "gene:" + gene;
     end
-    if strlength(chromCol) > 0
-        chromValue = normalizeToken(row.(chromCol));
-        if strlength(chromValue) > 0
-            tokens(end + 1, 1) = "chrom:" + chromValue; %#ok<AGROW>
+    if strlength(col_chrom) > 0
+        valor_chrom = normalizeToken(linha.(col_chrom));
+        if strlength(valor_chrom) > 0
+            tokens(end + 1, 1) = "chrom:" + valor_chrom;
         end
     end
-    if strlength(refCol) > 0
-        refValue = normalizeToken(row.(refCol));
-        if strlength(refValue) > 0
-            tokens(end + 1, 1) = "ref:" + refValue; %#ok<AGROW>
+    if strlength(col_ref) > 0
+        valor_ref = normalizeToken(linha.(col_ref));
+        if strlength(valor_ref) > 0
+            tokens(end + 1, 1) = "ref:" + valor_ref;
         end
     end
-    if strlength(altCol) > 0
-        altValue = normalizeToken(row.(altCol));
-        if strlength(altValue) > 0
-            tokens(end + 1, 1) = "alt:" + altValue; %#ok<AGROW>
+    if strlength(col_alt) > 0
+        valor_alt = normalizeToken(linha.(col_alt));
+        if strlength(valor_alt) > 0
+            tokens(end + 1, 1) = "alt:" + valor_alt;
         end
     end
-    if strlength(consequence) > 0
-        tokens(end + 1, 1) = "conseq:" + consequence; %#ok<AGROW>
+    if strlength(consequencia) > 0
+        tokens(end + 1, 1) = "conseq:" + consequencia;
     end
 
     tokens = unique(tokens(tokens ~= ""));
 end
 
-function fieldName = findColumnName(variableNames, desiredNames)
-    fieldName = "";
-    variableNames = string(variableNames);
-    desiredNames = string(desiredNames);
-    for i = 1:numel(desiredNames)
-        idx = find(lower(variableNames) == lower(desiredNames(i)), 1);
+function nome_campo = procurar_nome_coluna(nomes_variaveis, nomes_desejados)
+    nome_campo = "";
+    nomes_variaveis = string(nomes_variaveis);
+    nomes_desejados = string(nomes_desejados);
+    for i = 1:numel(nomes_desejados)
+        idx = find(lower(nomes_variaveis) == lower(nomes_desejados(i)), 1);
         if ~isempty(idx)
-            fieldName = variableNames(idx);
+            nome_campo = nomes_variaveis(idx);
             return;
         end
     end
 end
-
-% normalizeToken now implemented in utils/normalizeToken.m

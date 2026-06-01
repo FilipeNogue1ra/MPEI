@@ -1,115 +1,96 @@
 % teste_naivebayes.m
-% Teste avançado e rigoroso do classificador Naïve Bayes com dados reais (MPEI)
-
 clc; clear; close all;
 fprintf('=== Teste Avançado do Classificador Naïve Bayes ===\n\n');
 
 %% 1. Carregamento dos Dados Reais
-dados_mat = 'dados_clinvar_processados.mat';
-if ~isfile(dados_mat)
-    error('Ficheiro de dados %s não encontrado. Por favor, execute o script principal primeiro.', dados_mat);
+ficheiro_mat = 'dados_clinvar_processados.mat';
+if ~isfile(ficheiro_mat)
+    error('Ficheiro de dados %s não encontrado. Por favor, execute o script principal primeiro.', ficheiro_mat);
 end
 
-load(dados_mat, 'dados_treino', 'dados_teste');
+load(ficheiro_mat, 'dados_treino', 'dados_teste');
 
-% Limpeza de dados com classes em falta
 dados_treino(dados_treino.CLNSIG == "" | ismissing(dados_treino.CLNSIG), :) = [];
 dados_teste(dados_teste.CLNSIG == "" | ismissing(dados_teste.CLNSIG), :) = [];
 
-% Juntar os dados para podermos fazer partições controladas
 dados_totais = [dados_treino; dados_teste];
 n_total = height(dados_totais);
 fprintf('Total de instâncias reais disponíveis para validação: %d\n\n', n_total);
 
 %% 2. Curva de Aprendizagem (Accuracy vs. Percentagem de Treino)
-propTrain = 0.5:0.1:0.9; % Variamos de 50% a 90% de treino
-accVals = zeros(size(propTrain));
-precisionVals = zeros(size(propTrain));
-recallVals = zeros(size(propTrain));
-F1Vals = zeros(size(propTrain));
+proporcoes_treino = 0.5:0.1:0.9;
+valores_acuracia = zeros(size(proporcoes_treino));
 
-features = {'Gene', 'CHROM', 'REF', 'ALT', 'Consequence'};
-target = 'CLNSIG';
+atributos = {'Gene', 'CHROM', 'REF', 'ALT', 'Consequence'};
+alvo = 'CLNSIG';
 
-% Classes únicas
-classes_unicas = unique(string(dados_totais.(target)));
+classes_unicas = unique(string(dados_totais.(alvo)));
 num_classes = numel(classes_unicas);
 
-% Para guardar a matriz de confusão da última iteração (90% treino)
-confMatFinal = [];
-classesReaisFinal = [];
-classesPreditasFinal = [];
+classes_reais_finais = [];
+classes_preditas_finais = [];
 
-for idx = 1:numel(propTrain)
-    p = propTrain(idx);
+for idx = 1:numel(proporcoes_treino)
+    proporcao = proporcoes_treino(idx);
     
-    % Divisão Treino/Teste
-    rng(100 + idx); % Semente diferente para cada divisão para diversidade
-    cv = cvpartition(n_total, 'HoldOut', 1 - p);
-    tr = dados_totais(training(cv), :);
-    te = dados_totais(test(cv), :);
+    rng(100 + idx);
+    particao = cvpartition(n_total, 'HoldOut', 1 - proporcao);
+    treino = dados_totais(training(particao), :);
+    teste = dados_totais(test(particao), :);
     
-    % Treinar Classificador
-    nb = NaiveBayes(1); % Suavização de Laplace alpha = 1
-    nb.treinar(tr, target, features);
+    nb = NaiveBayes(1);
+    nb.treinar(treino, alvo, atributos);
     
-    % Classificar conjunto de teste
-    n_test = height(te);
-    predicoes = strings(n_test, 1);
-    for r = 1:n_test
-        [classe_pred, ~, ~] = nb.classificar(te(r, :));
+    n_teste = height(teste);
+    predicoes = strings(n_teste, 1);
+    for r = 1:n_teste
+        [classe_pred, ~, ~] = nb.classificar(teste(r, :));
         predicoes(r) = classe_pred;
     end
-    reais = string(te.(target));
+    reais = string(teste.(alvo));
     
-    % Métricas Globais
-    accuracy = sum(predicoes == reais) / n_test;
-    accVals(idx) = accuracy;
+    acuracia = sum(predicoes == reais) / n_teste;
+    valores_acuracia(idx) = acuracia;
     
-    % Guardar dados da última partição para o gráfico de matriz de confusão
-    if idx == numel(propTrain)
-        classesReaisFinal = reais;
-        classesPreditasFinal = predicoes;
+    if idx == numel(proporcoes_treino)
+        classes_reais_finais = reais;
+        classes_preditas_finais = predicoes;
     end
 end
 
-% ---------- Gráfico 5 – Curva de Aprendizagem (Accuracy vs. Percentagem de Treino) ----------
 figure('Position',[100 100 600 400]);
-plot(propTrain * 100, accVals * 100, '-o', 'LineWidth', 1.5, 'MarkerFaceColor', 'b');
+plot(proporcoes_treino * 100, valores_acuracia * 100, '-o', 'LineWidth', 1.5, 'MarkerFaceColor', 'b');
 xlabel('Percentagem de dados de treino (%)');
 ylabel('Accuracy (%)');
 title('Curva de Aprendizagem do Naïve Bayes (Dados Reais)');
 grid on;
 saveas(gcf, 'fig_nb_accuracy_vs_train_new.png');
 
-% ---------- Gráfico 6 – Matriz de Confusão (heatmap real) ----------
 figure('Position',[100 100 550 450]);
-confusionchart(classesReaisFinal, classesPreditasFinal, ...
-    'Title', sprintf('Matriz de Confusão (Partição de %.0f%% Treino)', propTrain(end)*100), ...
+confusionchart(classes_reais_finais, classes_preditas_finais, ...
+    'Title', sprintf('Matriz de Confusão (Partição de %.0f%% Treino)', proporcoes_treino(end)*100), ...
     'ColumnSummary', 'column-normalized', 'RowSummary', 'row-normalized');
 saveas(gcf, 'fig_nb_confusion_new.png');
 
 %% 3. Relatório de Métricas Finais
 fprintf('--- Relatório de Métricas Finais (Naïve Bayes no Dataset Real) ---\n');
-fprintf('Partição de Treino: %.0f%% | Partição de Teste: %.0f%%\n', propTrain(end)*100, (1-propTrain(end))*100);
-fprintf('Accuracy Global: %.2f%%\n\n', accVals(end) * 100);
+fprintf('Partição de Treino: %.0f%% | Partição de Teste: %.0f%%\n', proporcoes_treino(end)*100, (1-proporcoes_treino(end))*100);
+fprintf('Accuracy Global: %.2f%%\n\n', valores_acuracia(end) * 100);
 
-% Métricas por classe
 fprintf('Métricas Detalhadas por Classe:\n');
 for c = 1:num_classes
-    class_name = classes_unicas(c);
+    nome_classe = classes_unicas(c);
     
-    % Binário para esta classe
-    tp = sum(classesPreditasFinal == class_name & classesReaisFinal == class_name);
-    fp = sum(classesPreditasFinal == class_name & classesReaisFinal ~= class_name);
-    fn = sum(classesPreditasFinal ~= class_name & classesReaisFinal == class_name);
+    verdadeiros_positivos = sum(classes_preditas_finais == nome_classe & classes_reais_finais == nome_classe);
+    falsos_positivos = sum(classes_preditas_finais == nome_classe & classes_reais_finais ~= nome_classe);
+    falsos_negativos = sum(classes_preditas_finais ~= nome_classe & classes_reais_finais == nome_classe);
     
-    precision = tp / (tp + fp + eps);
-    recall = tp / (tp + fn + eps);
-    f1 = 2 * precision * recall / (precision + recall + eps);
+    precisao = verdadeiros_positivos / (verdadeiros_positivos + falsos_positivos + eps);
+    sensibilidade = verdadeiros_positivos / (verdadeiros_positivos + falsos_negativos + eps);
+    f1 = 2 * precisao * sensibilidade / (precisao + sensibilidade + eps);
     
-    fprintf(' Classe: %s\n', class_name);
-    fprintf('   Precision: %.2f%%\n', precision * 100);
-    fprintf('   Recall (Sensibilidade): %.2f%%\n', recall * 100);
+    fprintf(' Classe: %s\n', nome_classe);
+    fprintf('   Precision: %.2f%%\n', precisao * 100);
+    fprintf('   Recall (Sensibilidade): %.2f%%\n', sensibilidade * 100);
     fprintf('   F1-Score: %.4f\n', f1);
 end

@@ -1,35 +1,32 @@
 % Extrai Gene e Consequence do campo INFO.
-% O campo INFO é uma string com formato "key=value;key=value;...".
-% Utilizado pelo modulo de preparação de dados
-
-function [gene, consequence] = extrair_campos_clinvar(infoValue)
+function [gene, consequencia] = extrair_campos_clinvar(valor_info)
 
     gene = "";
-    consequence = "";
+    consequencia = "";
 
-    if ismissing(infoValue) || strlength(strtrim(string(infoValue))) == 0
+    if ismissing(valor_info) || strlength(strtrim(string(valor_info))) == 0
         return;
     end
 
-    entries = split(string(infoValue), ";");
-    for i = 1:numel(entries)
-        entry = strtrim(entries(i));
-        if strlength(entry) == 0
+    entradas = split(string(valor_info), ";");
+    for i = 1:numel(entradas)
+        entrada = strtrim(entradas(i));
+        if strlength(entrada) == 0
             continue;
         end
 
-        parts = split(entry, "=");
-        key = upper(strtrim(parts(1)));
+        partes = split(entrada, "=");
+        chave = upper(strtrim(partes(1)));
 
-        if key == "GENEINFO" && numel(parts) > 1 && strlength(gene) == 0
-            rawGene = strtrim(split(string(strjoin(parts(2:end), "=")), "|"));
-            if ~isempty(rawGene)
-                gene = normalizeToken(rawGene(1));
+        if chave == "GENEINFO" && numel(partes) > 1 && strlength(gene) == 0
+            gene_bruto = strtrim(split(string(strjoin(partes(2:end), "=")), "|"));
+            if ~isempty(gene_bruto)
+                gene = normalizeToken(gene_bruto(1));
             end
-        elseif key == "MC" && numel(parts) > 1 && strlength(consequence) == 0
-            consequence = normalizeToken(strjoin(parts(2:end), "="));
-        elseif key == "CLNDN" && numel(parts) > 1 && strlength(consequence) == 0
-            consequence = normalizeToken(strjoin(parts(2:end), "="));
+        elseif chave == "MC" && numel(partes) > 1 && strlength(consequencia) == 0
+            consequencia = normalizeToken(strjoin(partes(2:end), "="));
+        elseif chave == "CLNDN" && numel(partes) > 1 && strlength(consequencia) == 0
+            consequencia = normalizeToken(strjoin(partes(2:end), "="));
         end
     end
 end

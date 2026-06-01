@@ -54,12 +54,12 @@ function app_oncologia()
         lblStatus.Text = 'A ler clinvar.csv e a preparar dados...';
         drawnow;
         
-        dados_mat = 'dados_clinvar_processados.mat';
+        ficheiro_mat = 'dados_clinvar_processados.mat';
         try
-            if ~isfile(dados_mat)
-                [dados_treino, dados_teste, ~] = preparacao_dados_clinvar('clinvar.csv', dados_mat, 5000);
+            if ~isfile(ficheiro_mat)
+                [dados_treino, dados_teste, ~] = preparacao_dados_clinvar('clinvar.csv', ficheiro_mat, 5000);
             else
-                load(dados_mat, 'dados_treino', 'dados_teste');
+                load(ficheiro_mat, 'dados_treino', 'dados_teste');
             end
             
             dados_treino(dados_treino.CLNSIG == "" | ismissing(dados_treino.CLNSIG), :) = [];
@@ -69,8 +69,8 @@ function app_oncologia()
             drawnow;
             
             % 1. Inicializar e Treinar Filtro de Bloom
-            n_high_risk = sum(dados_treino.is_high_risk);
-            m_bloom = max(1000, round(8 * n_high_risk));
+            n_alto_risco = sum(dados_treino.is_high_risk);
+            m_bloom = max(1000, round(8 * n_alto_risco));
             k_bloom = 5;
             filtro_bloom = FiltroBloom(m_bloom, k_bloom);
             chaves_alto_risco = dados_treino.variant_key(dados_treino.is_high_risk);
@@ -79,11 +79,11 @@ function app_oncologia()
             end
             
             % 2. Inicializar e Treinar MinHash
-            numHashes = 150;
-            shingleSize = 5;
-            minhash = MinHash(numHashes, shingleSize, 42);
+            num_hashes = 150;
+            tamanho_shingle = 5;
+            minhash = MinHash(num_hashes, tamanho_shingle, 42);
             n_treino = height(dados_treino);
-            assinaturas_treino = zeros(n_treino, numHashes, 'uint64');
+            assinaturas_treino = zeros(n_treino, num_hashes, 'uint64');
             for i = 1:n_treino
                 assinaturas_treino(i, :) = minhash.gerarAssinatura(char(dados_treino.Perfil(i)));
             end
@@ -105,8 +105,8 @@ function app_oncologia()
             btnComparar.Enable = 'on';
             atualizarDetalhesPaciente();
             
-        catch ME
-            lblStatus.Text = ['Erro: ' ME.message];
+        catch excepcao
+            lblStatus.Text = ['Erro: ' excepcao.message];
             btnLoad.Enable = 'on';
         end
     end
@@ -122,7 +122,7 @@ function app_oncologia()
         lblDetalhes.Text = sprintf('<b>Gene:</b> %s | <b>Cromossoma:</b> %s | <b>Mutacao:</b> %s > %s | <b>Consequencia:</b> %s<br><b>Significancia Clinica Real:</b> %s<br><b>Perfil:</b> %s', ...
             paciente.Gene, paciente.CHROM, paciente.REF, paciente.ALT, paciente.Consequence, paciente.CLNSIG, paciente.Perfil);
         lblDetalhes.Interpreter = 'html'; 
-    end
+     end
 
     function executarPipeline()
         if isempty(dados_teste) || isempty(minhash) || isempty(filtro_bloom) || isempty(nb), return; end
@@ -134,8 +134,8 @@ function app_oncologia()
         paciente = dados_teste(idx_paciente, :);
         
         % 1. Filtro de Bloom (Triagem)
-        isRisk = filtro_bloom.Verificar(paciente.variant_key);
-        if isRisk
+        e_risco = filtro_bloom.Verificar(paciente.variant_key);
+        if e_risco
             lblBloomVal.Text = 'ALERTA: Variante de Risco!';
             lblBloomVal.BackgroundColor = [1 0.3 0.3];
             lblBloomVal.FontColor = [1 1 1];
@@ -172,16 +172,16 @@ function app_oncologia()
         
         [valores_sim, indices_top] = maxk(similaridades, 5);
         
-        data = cell(5, 4);
+        dados_tabela = cell(5, 4);
         for k = 1:5
-            idx_hist = indices_top(k);
-            paciente_hist = dados_treino(idx_hist, :);
+            idx_historico = indices_top(k);
+            paciente_historico = dados_treino(idx_historico, :);
             
-            data{k, 1} = sprintf('Top %d', k);
-            data{k, 2} = sprintf('%.1f%%', valores_sim(k) * 100);
-            data{k, 3} = char(paciente_hist.Gene);
-            data{k, 4} = char(paciente_hist.CLNSIG);
+            dados_tabela{k, 1} = sprintf('Top %d', k);
+            dados_tabela{k, 2} = sprintf('%.1f%%', valores_sim(k) * 100);
+            dados_tabela{k, 3} = char(paciente_historico.Gene);
+            dados_tabela{k, 4} = char(paciente_historico.CLNSIG);
         end
-        tblResultados.Data = data;
+        tblResultados.Data = dados_tabela;
     end
 end

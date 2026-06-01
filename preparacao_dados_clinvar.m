@@ -1,70 +1,67 @@
-function [dados_treino, dados_teste, resumo] = preparacao_dados_clinvar(inputFile, outputMat, maxRows)
-%   Pré-processa o ClinVar para o fluxo do sistema.
-%   Extrai Gene e Consequence do INFO (extrair_campos_clinvar.m),
-%   constrói o perfil da variante (build_clinvar_variant_string.m),
-%   separa treino/teste e devolve uma tabela pronta para os módulos.
+function [dados_treino, dados_teste, resumo] = preparacao_dados_clinvar(ficheiro_entrada, ficheiro_mat, max_linhas)
+% Pré-processa o ClinVar para o fluxo do sistema.
 
-    if nargin < 1 || isempty(inputFile)
-        inputFile = 'clinvar.csv';
+    if nargin < 1 || isempty(ficheiro_entrada)
+        ficheiro_entrada = 'clinvar.csv';
     end
-    if nargin < 2 || isempty(outputMat)
-        outputMat = 'dados_clinvar_processados.mat';
+    if nargin < 2 || isempty(ficheiro_mat)
+        ficheiro_mat = 'dados_clinvar_processados.mat';
     end
     if nargin < 3
-        maxRows = [];
+        max_linhas = [];
     end
 
-    fprintf('A carregar ClinVar de %s...\n', inputFile);
+    fprintf('A carregar ClinVar de %s...\n', ficheiro_entrada);
 
-    opts = detectImportOptions(inputFile, 'TextType', 'string');
-    opts.SelectedVariableNames = selectUsefulColumns(opts.VariableNames);
+    opcoes = detectImportOptions(ficheiro_entrada, 'TextType', 'string');
+    opcoes.SelectedVariableNames = selecionar_colunas_uteis(opcoes.VariableNames);
 
-    if ~isempty(maxRows)
-        opts.DataLines = [2, maxRows + 1];
+    if ~isempty(max_linhas)
+        opcoes.DataLines = [2, max_linhas + 1];
     end
 
-    dados = readtable(inputFile, opts);
+    dados = readtable(ficheiro_entrada, opcoes);
 
-    chromCol = findColumnName(dados.Properties.VariableNames, ["CHROM", "Chrom", "chrom"]);
-    refCol = findColumnName(dados.Properties.VariableNames, ["REF", "Ref", "ref"]);
-    altCol = findColumnName(dados.Properties.VariableNames, ["ALT", "Alt", "alt"]);
-    infoCol = findColumnName(dados.Properties.VariableNames, ["INFO", "Info", "info"]);
-    clnsigCol = findColumnName(dados.Properties.VariableNames, ["CLNSIG", "Clnsig", "clinical_significance"]);
+    col_chrom = procurar_nome_coluna(dados.Properties.VariableNames, ["CHROM", "Chrom", "chrom"]);
+    col_ref = procurar_nome_coluna(dados.Properties.VariableNames, ["REF", "Ref", "ref"]);
+    col_alt = procurar_nome_coluna(dados.Properties.VariableNames, ["ALT", "Alt", "alt"]);
+    col_info = procurar_nome_coluna(dados.Properties.VariableNames, ["INFO", "Info", "info"]);
+    col_clnsig = procurar_nome_coluna(dados.Properties.VariableNames, ["CLNSIG", "Clnsig", "clinical_significance"]);
 
     for idx = 1:height(dados)
         linha = dados(idx, :);
-        [gene, consequence] = extrair_campos_clinvar(getFieldValue(linha, infoCol));
-        dados.Gene(idx, 1) = gene; %#ok<AGROW>
-        dados.Consequence(idx, 1) = consequence; %#ok<AGROW>
-        dados.Perfil(idx, 1) = build_clinvar_variant_string(linha); %#ok<AGROW>
-        dados.variant_key(idx, 1) = composeVariantKey(linha, chromCol, refCol, altCol); %#ok<AGROW>
-        if strlength(clnsigCol) > 0
-            clnsigValue = string(linha.(clnsigCol));
-            dados.CLNSIG(idx, 1) = clnsigValue; %#ok<AGROW>
-            dados.is_high_risk(idx, 1) = any(contains(lower(clnsigValue), ["pathogenic", "likely_pathogenic", "risk_factor", "conflicting_interpretations_of_pathogenicity"])); %#ok<AGROW>
+        [gene, consequencia] = extrair_campos_clinvar(obter_valor_campo(linha, col_info));
+        dados.Gene(idx, 1) = gene;
+        dados.Consequence(idx, 1) = consequencia;
+        dados.Perfil(idx, 1) = build_clinvar_variant_string(linha);
+        dados.variant_key(idx, 1) = compor_chave_variante(linha, col_chrom, col_ref, col_alt);
+        if strlength(col_clnsig) > 0
+            valor_clnsig = string(linha.(col_clnsig));
+            dados.CLNSIG(idx, 1) = valor_clnsig;
+            dados.is_high_risk(idx, 1) = any(contains(lower(valor_clnsig), ["pathogenic", "likely_pathogenic", "risk_factor", "conflicting_interpretations_of_pathogenicity"]));
         else
-            dados.CLNSIG(idx, 1) = ""; %#ok<AGROW>
-            dados.is_high_risk(idx, 1) = false; %#ok<AGROW>
+            dados.CLNSIG(idx, 1) = "";
+            dados.is_high_risk(idx, 1) = false;
         end
     end
 
-    varsToCheck = {};
-    if strlength(chromCol) > 0, varsToCheck{end + 1} = char(chromCol); end %#ok<AGROW>
-    if strlength(refCol) > 0, varsToCheck{end + 1} = char(refCol); end %#ok<AGROW>
-    if strlength(altCol) > 0, varsToCheck{end + 1} = char(altCol); end %#ok<AGROW>
-    if strlength(infoCol) > 0, varsToCheck{end + 1} = char(infoCol); end %#ok<AGROW>
-    if ~isempty(varsToCheck)
-        dados = rmmissing(dados, 'DataVariables', varsToCheck);
+    colunas_a_verificar = {};
+    if strlength(col_chrom) > 0, colunas_a_verificar{end + 1} = char(col_chrom); end
+    if strlength(col_ref) > 0, colunas_a_verificar{end + 1} = char(col_ref); end
+    if strlength(col_alt) > 0, colunas_a_verificar{end + 1} = char(col_alt); end
+    if strlength(col_info) > 0, colunas_a_verificar{end + 1} = char(col_info); end
+    if ~isempty(colunas_a_verificar)
+        dados = rmmissing(dados, 'DataVariables', colunas_a_verificar);
     end
 
     dados = removevars(dados, intersect(string(dados.Properties.VariableNames), ["INFO"]));
 
     rng(0);
     total = height(dados);
-    idx = randperm(total);
-    nTreino = max(1, round(0.8 * total));
-    dados_treino = dados(idx(1:nTreino), :);
-    dados_teste = dados(idx(nTreino + 1:end), :);
+    indices = randperm(total);
+    n_treino = max(1, round(0.8 * total));
+    dados_treino = dados(indices(1:n_treino), :);
+    dados_teste = dados(indices(n_treino + 1:end), :);
 
     resumo = struct();
     resumo.total = total;
@@ -73,76 +70,76 @@ function [dados_treino, dados_teste, resumo] = preparacao_dados_clinvar(inputFil
     resumo.colunas = string(dados.Properties.VariableNames);
     resumo.qtd_high_risk = sum(dados.is_high_risk);
 
-    dados_treino = reorderForFlow(dados_treino);
-    dados_teste = reorderForFlow(dados_teste);
+    dados_treino = reordenar_para_fluxo(dados_treino);
+    dados_teste = reordenar_para_fluxo(dados_teste);
 
-    save(outputMat, 'dados_treino', 'dados_teste', 'resumo');
+    save(ficheiro_mat, 'dados_treino', 'dados_teste', 'resumo');
 
     fprintf('ClinVar preparado com sucesso:\n');
     fprintf('  - Total de amostras processadas: %d\n', total);
     fprintf('  - Treino: %d\n', resumo.treino);
     fprintf('  - Teste: %d\n', resumo.teste);
     fprintf('  - Variantes de alto risco: %d\n', resumo.qtd_high_risk);
-    fprintf('  - Guardado em: %s\n', outputMat);
+    fprintf('  - Guardado em: %s\n', ficheiro_mat);
 end
 
-function selected = selectUsefulColumns(variableNames)
-    desired = ["CHROM", "REF", "ALT", "INFO", "CLNSIG", "Varyant_Tipi", "Variant_Tipi", "Target", "CHROM_Encoded", "VT_Encoded"];
-    variableNames = string(variableNames);
-    selected = strings(0, 1);
+function selecionadas = selecionar_colunas_uteis(nomes_variaveis)
+    desejadas = ["CHROM", "REF", "ALT", "INFO", "CLNSIG", "Varyant_Tipi", "Variant_Tipi", "Target", "CHROM_Encoded", "VT_Encoded"];
+    nomes_variaveis = string(nomes_variaveis);
+    selecionadas = strings(0, 1);
 
-    for i = 1:numel(desired)
-        idx = find(lower(variableNames) == lower(desired(i)), 1);
+    for i = 1:numel(desejadas)
+        idx = find(lower(nomes_variaveis) == lower(desejadas(i)), 1);
         if ~isempty(idx)
-            selected(end + 1, 1) = variableNames(idx); %#ok<AGROW>
+            selecionadas(end + 1, 1) = nomes_variaveis(idx);
         end
     end
 end
 
-function fieldName = findColumnName(variableNames, aliases)
-    fieldName = "";
-    variableNames = string(variableNames);
-    aliases = string(aliases);
+function nome_campo = procurar_nome_coluna(nomes_variaveis, sinonimos)
+    nome_campo = "";
+    nomes_variaveis = string(nomes_variaveis);
+    sinonimos = string(sinonimos);
 
-    for i = 1:numel(aliases)
-        idx = find(lower(variableNames) == lower(aliases(i)), 1);
+    for i = 1:numel(sinonimos)
+        idx = find(lower(nomes_variaveis) == lower(sinonimos(i)), 1);
         if ~isempty(idx)
-            fieldName = variableNames(idx);
+            nome_campo = nomes_variaveis(idx);
             return;
         end
     end
 end
 
-function value = getFieldValue(row, fieldName)
-    value = "";
-    if strlength(fieldName) > 0
-        value = string(row.(fieldName));
+function valor = obter_valor_campo(linha, nome_campo)
+    valor = "";
+    if strlength(nome_campo) > 0
+        valor = string(linha.(nome_campo));
     end
 end
 
-function key = composeVariantKey(row, chromCol, refCol, altCol)
-    if strlength(chromCol) == 0 || strlength(refCol) == 0 || strlength(altCol) == 0
-        key = "";
+function chave = compor_chave_variante(linha, col_chrom, col_ref, col_alt)
+    if strlength(col_chrom) == 0 || strlength(col_ref) == 0 || strlength(col_alt) == 0
+        chave = "";
         return;
     end
 
-    key = string(row.(chromCol)) + ":" + string(row.(refCol)) + ">" + string(row.(altCol));
+    chave = string(linha.(col_chrom)) + ":" + string(linha.(col_ref)) + ">" + string(linha.(col_alt));
 end
 
-function tabela = reorderForFlow(tabela)
-    preferred = ["Gene", "CHROM", "REF", "ALT", "Consequence", "CLNSIG", "variant_key", "Perfil", "is_high_risk"];
-    available = string(tabela.Properties.VariableNames);
-    order = strings(0, 1);
+function tabela = reordenar_para_fluxo(tabela)
+    preferidas = ["Gene", "CHROM", "REF", "ALT", "Consequence", "CLNSIG", "variant_key", "Perfil", "is_high_risk"];
+    disponiveis = string(tabela.Properties.VariableNames);
+    ordem = strings(0, 1);
 
-    for i = 1:numel(preferred)
-        idx = find(lower(available) == lower(preferred(i)), 1);
+    for i = 1:numel(preferidas)
+        idx = find(lower(disponiveis) == lower(preferidas(i)), 1);
         if ~isempty(idx)
-            order(end + 1, 1) = available(idx); %#ok<AGROW>
+            ordem(end + 1, 1) = disponiveis(idx);
         end
     end
 
-    if ~isempty(order)
-        remaining = setdiff(available, order, 'stable');
-        tabela = tabela(:, [cellstr(order); cellstr(remaining(:))]);
+    if ~isempty(ordem)
+        restantes = setdiff(disponiveis, ordem, 'stable');
+        tabela = tabela(:, [cellstr(ordem); cellstr(restantes(:))]);
     end
 end

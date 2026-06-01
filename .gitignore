@@ -43,3 +43,7 @@ codegen/
 clinvar.csv
 *.pdf
 *.png
+*.aux
+*.log
+*fdb_latexmk
+*.fls

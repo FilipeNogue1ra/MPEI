@@ -1,106 +1,84 @@
 % Modulo de MinHash
-% Implementação do algoritmo de deteção de mutações similares.
-% Divide perfis genéticos/mutações em "shingles" (k-gramas),
-% gera matrizes de assinaturas usando funções de hash lineares
-% e estima a Similaridade de Jaccard.
-
 classdef MinHash < handle
     
     properties
-        numHashes   % Número de funções de hash (tamanho da assinatura)
-        shingleSize % Tamanho do shingle (k-gramas, ex: 2 ou 3 caracteres)
-        p           % Número primo grande para as funções de hash
-        A           % Array de coeficientes 'a' para h(x) = (ax + b) mod p
-        B           % Array de coeficientes 'b' para h(x) = (ax + b) mod p
+        num_hashes
+        tamanho_shingle
+        p
+        A
+        B
     end
     
     methods
-        % 1. Inicializar o objeto MinHash
-        function obj = MinHash(n_hashes, k_shingle, seed)
+        function obj = MinHash(n_hashes, k_shingle, semente)
             if nargin < 3
-                seed = [];
+                semente = [];
             end
 
-            if ~isempty(seed)
-                rng(seed);
+            if ~isempty(semente)
+                rng(semente);
             end
 
             if nargin < 2
                 error('MinHash requer pelo menos o número de hashes e o tamanho do shingle.');
             end
 
-            obj.numHashes = n_hashes;
-            obj.shingleSize = k_shingle;
-            obj.p = uint64(4294967291); % Número primo grande para evitar colisões
+            obj.num_hashes = n_hashes;
+            obj.tamanho_shingle = k_shingle;
+            obj.p = uint64(4294967291);
             
-            % Gerar coeficientes aleatórios para as funções de dispersão
-            % h(x) = (A*x + B) mod p
-            limiteSuperior = double(obj.p - 1);
-            obj.A = uint64(randi([1, limiteSuperior], 1, n_hashes));
-            obj.B = uint64(randi([0, limiteSuperior], 1, n_hashes));
+            limite_superior = double(obj.p - 1);
+            obj.A = uint64(randi([1, limite_superior], 1, n_hashes));
+            obj.B = uint64(randi([0, limite_superior], 1, n_hashes));
         end
         
-        % 2. Extrair Shingles e converter para IDs numéricos
-        function ids = obterShingles(obj, str)
-            str = char(str); % Garantir que é um vetor de caracteres
-            tamanho = length(str);
+        function ids = obterShingles(obj, texto)
+            texto = char(texto);
+            tamanho = length(texto);
 
-            if isempty(str)
+            if isempty(texto)
                 ids = uint64(0);
                 return;
             end
             
-            % Se a string for mais curta que o shingle, usamos a string toda
-            if tamanho < obj.shingleSize
-                ids = obj.string2id(str);
+            if tamanho < obj.tamanho_shingle
+                ids = obj.texto2id(texto);
                 return;
             end
             
-            numShingles = tamanho - obj.shingleSize + 1;
-            ids = zeros(1, numShingles, 'uint64');
+            num_shingles = tamanho - obj.tamanho_shingle + 1;
+            ids = zeros(1, num_shingles, 'uint64');
             
-            % Deslizar a janela para criar os k-gramas
-            for i = 1:numShingles
-                shingle = str(i:(i + obj.shingleSize - 1));
-                % Converter o texto do shingle num número inteiro identificador
-                ids(i) = obj.string2id(shingle);
+            for i = 1:num_shingles
+                shingle = texto(i:(i + obj.tamanho_shingle - 1));
+                ids(i) = obj.texto2id(shingle);
             end
             
-            % Remover shingles duplicados na mesma string (Conjunto único)
             ids = unique(ids);
         end
         
-        % 3. Gerar a Assinatura MinHash (A Matriz/Vetor Reduzido)
-        function assinatura = gerarAssinatura(obj, str)
-            % Obter os IDs dos shingles desta string
-            shingles_ids = obj.obterShingles(str);
-            assinatura = zeros(1, obj.numHashes, 'uint64');
+        function assinatura = gerarAssinatura(obj, texto)
+            ids_shingles = obj.obterShingles(texto);
+            assinatura = zeros(1, obj.num_hashes, 'uint64');
             
-            % Para cada função de hash...
-            for i = 1:obj.numHashes
-                % Aplicar a função h(x) = (a*x + b) mod p a todos os shingles
-                valores_hash = mod(obj.A(i) .* shingles_ids + obj.B(i), obj.p);
-                
-                % O MINHASH: guardar apenas o valor mínimo!
+            for i = 1:obj.num_hashes
+                valores_hash = mod(obj.A(i) .* ids_shingles + obj.B(i), obj.p);
                 assinatura(i) = min(valores_hash);
             end
         end
         
-        % 4. Estimar a Similaridade de Jaccard entre duas assinaturas
         function similaridade = estimarJaccard(obj, assinatura1, assinatura2)
-            % A similaridade é a fração de posições onde as assinaturas coincidem
             coincidencias = sum(assinatura1 == assinatura2);
-            similaridade = coincidencias / obj.numHashes;
+            similaridade = coincidencias / obj.num_hashes;
         end
     end
     
     methods (Access = private)
-        % Função auxiliar privada para converter um texto shingle num ID numérico único
-        function id = string2id(~, str)
-            % Uma adaptação simples do djb2 para gerar inteiros
+        % Adaptação do djb2 para gerar IDs inteiros para os shingles
+        function id = texto2id(~, texto)
             id = uint64(5381);
-            for i = 1:length(str)
-                id = mod(id * 33 + uint64(double(str(i))), uint64(4294967295));
+            for i = 1:length(texto)
+                id = mod(id * 33 + uint64(double(texto(i))), uint64(4294967295));
             end
         end
     end
