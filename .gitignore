@@ -41,3 +41,5 @@ codegen/
 
 
 clinvar.csv
+*.pdf
+*.png

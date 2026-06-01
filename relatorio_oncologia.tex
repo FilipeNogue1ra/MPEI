@@ -1,0 +1,174 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[portuguese]{babel}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{geometry}
+\usepackage{amsmath}
+\geometry{a4paper, margin=2.5cm}
+
+\begin{document}
+
+\begin{titlepage}
+    \centering
+    \vspace*{1cm}
+    
+    {\large universidade de aveiro \par}
+    {\large departamento de electrónica, \par deti telecomunicações e informática \par}
+    
+    \vspace{2.5cm}
+    
+    {\Large Métodos Probabilísticos para Engenharia Informática \par 2025/26 \par}
+    
+    \vspace{2.5cm}
+    
+    {\huge\bfseries Projeto Final \par Sistema de Apoio à Decisão Clínico-Oncológica \par através de Algoritmos Probabilísticos \par}
+    
+    \vspace{3cm}
+    
+    {\Large Nome do Aluno 1 - NMec \par Nome do Aluno 2 - NMec \par}
+    
+    \vfill
+    
+    {\large Professor das Aulas Teóricas: \par António Joaquim da Silva Teixeira (ajst@ua.pt) \par}
+    
+    \vspace*{1cm}
+\end{titlepage}
+
+\newpage
+
+\section*{Introdução}
+Este relatório descreve a implementação de um sistema de apoio à decisão Clínico‑Oncológica desenvolvido em MatLab, com o objetivo de integrar técnicas probabilísticas para a análise de dados genómicos. Utilizando Filtros bloom para triagem eficiente, MinHash para análise de similaridade e o classificador Naïve Bayes para prever o impacto clínico de mutações, oferecendo um suporte á decisão médica
+\section*{Como correr o código}
+Para testar os componentes desenvolvidos, os programas encontram-se estruturados da seguinte forma na pasta do projeto:
+
+\begin{itemize}
+    \item \textbf{Interface Gráfica (app\_oncologia.m):} Executar o comando \texttt{app\_oncologia} no terminal do MatLab para abrir uma interface gráfica que permite carregar os dados, escolher pacientes e executar o fluxo de trabalho visualmente
+    \item \textbf{Demonstração Consola (main\_oncologia.m):} Executar o comando \texttt{main\_oncologia} para rodar o pipeline completo na consola com métricas (Accuracy) e visualização gráfica da Matriz de Confusão.
+    \item \textbf{Testes Unitários:} Para validar isoladamente a lógica de cada algoritmo com dados controlados, correr os scripts: \texttt{teste\_bloom.m}, \texttt{teste\_minhash.m} e \texttt{teste\_naivebayes.m}.
+\end{itemize}
+
+\textit{*Nota: Os scripts utilizam o dataset real genomic\_variants.csv (ou clinvar.csv). O script preparacao\_dados\_clinvar.m faz o pré-processamento de limpeza, extração de genes/consequências e a partição aleatória dos dados em 80\% para treino e 20\% para teste.}
+
+\section*{Aplicação Conjunta (main\_oncologia.m e app\_oncologia.m)}
+O pipeline integrado do sistema junta os 3 módulos para processar sob a seguinte lógica:
+
+\vspace{0.5cm}
+\noindent\textbf{Filtro de Bloom (Etapa 1 - Triagem de Risco)}
+\begin{itemize}
+    \item Verifica se o identificador único da mutação (a chave \texttt{variant\_key} no formato \texttt{CHROM:REF>ALT}) existe na base de dados de treino das variantes classificadas como patogénicas/alto risco.
+    \item Permite uma resposta instantânea. Se não estiver no filtro, o médico sabe com 100\% de certeza que a mutação é de baixo risco ou inédita no histórico.
+\end{itemize}
+
+\noindent\textbf{MinHash (Etapa 2 - Similaridade de Histórico)}
+\begin{itemize}
+    \item Converte o perfil textual longo do paciente (que junta gene, cromossoma, bases originais/alteradas e descrição da consequência clínica) em assinaturas compactadas usando 150 hashes lineares.
+    \item Estima a similaridade de Jaccard e apresenta na tabela o Top 5 de pacientes do histórico estatisticamente mais parecidos para sugerir tratamentos com base no sucesso de casos anteriores.
+\end{itemize}
+\newpage
+\noindent\textbf{Naïve Bayes (Etapa 3 - Diagnóstico Probabilístico)}
+\begin{itemize}
+    \item Preve a classe de significância clínica final da mutação (ex: \textit{Benign}, \textit{Pathogenic}, \dots) calculando probabilidades a priori a partir dos atributos genómicos (\texttt{Gene}, \texttt{CHROM}, \texttt{REF}, \texttt{ALT}, \texttt{Consequence}).
+    \item Aplica a suavização de Laplace para prevenir que mutações ou genes desconhecidos anulem as frações probabilísticas de classificação.
+\end{itemize}
+
+\section*{Testes e Validação}
+
+\subsection*{Módulo 1 - Filtro de Bloom (teste\_bloom.m)}
+Para validar o módulo de pertença, inicializámos um filtro de Bloom de tamanho $m = 8000$ e com $k = 3$ funções de hash lineares. Inserimos $n = 1000$ chaves genéticas de treino criadas aleatoriamente.
+
+Efetuámos testes exaustivos realizando $10.000$ consultas com strings que sabíamos de antemão não estarem presentes no filtro para calcular a taxa de falsos positivos de forma prática (empírica).
+
+\vspace{0.5cm}
+\noindent\textbf{Resultados e Fórmulas} \\
+A probabilidade teórica de falsos positivos ($P_{fp}$) é calculada através da fórmula:
+
+\[
+P_{fp} \approx \left(1 - e^{-\frac{k \cdot n}{m}}\right)^k
+\]
+
+Para os valores do teste ($m=8000$, $n=1000$, $k=3$):
+\[
+P_{fp} \approx \left(1 - e^{-\frac{3 \cdot 1000}{8000}}\right)^3 = \left(1 - e^{-0.375}\right)^3 \approx 0.0306 \text{ (ou seja, 3.06\%)}
+\]
+
+Nos testes empíricos, os resultados obtidos foram:
+\begin{itemize}
+    \item \textbf{Falsos Negativos:} 0 (Garantido teoricamente pelo Filtro de Bloom).
+    \item \textbf{Taxa Empírica de Falsos Positivos:} $\approx 3.02\%$ (Média observada).
+    \item \textbf{Erro de Convergência:} $< 0.1\%$ (Diferença entre o valor teórico e o prático).
+\end{itemize}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.55\textwidth]{fig_bloom_fp_vs_k_new.png}
+  \caption{Taxa de falsos positivos vs. número de funções de hash ($k$) para o filtro de Bloom.}
+  \label{fig:bloom-fp-vs-k}
+\end{figure}
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.55\textwidth]{fig_bloom_fp_vs_m_new.png}
+  \caption{Taxa de falsos positivos vs. tamanho do filtro ($m$) para o filtro de Bloom.}
+  \label{fig:bloom-fp-vs-m}
+\end{figure}
+
+\noindent\textbf{Conclusão} \\
+Os testes demonstram que a taxa empírica converge de forma muito precisa para a taxa teórica de $3.06\%$. Isto prova que as funções de dispersão (hash) baseadas no algoritmo djb2 distribuem os dados uniformemente pelo vetor de bits. Para reduzir as colisões/falsos positivos em ambiente clínico real, o tamanho $m$ do filtro deve ser aumentado.
+
+\subsection*{Módulo 2 - MinHash (teste\_minhash.m)}
+Para testar a estimativa de similaridade de Jaccard do MinHash, definimos duas strings representativas de perfis genéticos com uma interseção conhecida de palavras.
+
+Calculámos a similaridade teórica real no papel dividindo o tamanho da interseção dos shingles das duas strings pela sua união:
+\[
+J(A,B) = \frac{|A \cap B|}{|A \cup B|}
+\]
+
+Gerámos depois as assinaturas MinHash para as duas strings usando $N = 200$ hashes lineares e $k_{shingle} = 3$.
+
+\vspace{0.5cm}
+\noindent\textbf{Resultados e Conclusão} \\
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.55\textwidth]{fig_minhash_error_vs_N_new.png}
+  \caption{Erro de estimativa do MinHash em função do número de hashes $N$.}
+  \label{fig:minhash-error-vs-N}
+\end{figure}
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.55\textwidth]{fig_minhash_k_compare_new.png}
+  \caption{Comparação de desempenho do MinHash para diferentes valores de $k$ (tamanho do shingle).}
+  \label{fig:minhash-k-compare}
+\end{figure}
+O teste demonstram que a similaridade calculada a partir do vetor de assinaturas compactas do MinHash aproxima-se com elevada precisão do Jaccard real das strings (ex: erro absoluto médio $< 0.02$). O uso de $k_{shingle}=3$ (ou superior) revelou-se ideal para anotações genómicas, pois shingles muito curtos ($k=2$) geram falsas similaridades em palavras curtas do texto clínico.
+
+\subsection*{Módulo 3 - Naïve Bayes (teste\_naivebayes.m)}
+Validámos o comportamento probabilístico do classificador de Bayes criando uma tabela pequena com 6 amostras simuladas de 3 genes (\textit{SAMD11}, \textit{EGFR}, \textit{TP53}) e 2 classes (\textit{Pathogenic} e \textit{Benign}).
+
+Treinámos o classificador e testámos a previsão para dois cenários:
+\begin{enumerate}
+    \item \textbf{Variante comum (Gene e Consequência conhecidos):} O modelo calcula as frequências e classifica a amostra na classe mais provável com elevada certeza probabilística.
+    \item \textbf{Variante inédita (Gene desconhecido):} Onde se inseriu o gene \textit{BRCA1} (inexistente no treino).
+\end{enumerate}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.55\textwidth]{fig_nb_accuracy_vs_train_new.png}
+  \caption{Acurácia do classificador Naïve Bayes em função do tamanho de treino.}
+  \label{fig:nb-accuracy-vs-train}
+\end{figure}
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.55\textwidth]{fig_nb_confusion_new.png}
+  \caption{Matriz de confusão do classificador Naïve Bayes.}
+  \label{fig:nb-confusion}
+\end{figure}
+
+\vspace{0.5cm}
+\noindent\textbf{Resultados e Conclusão} \\
+Para a variante inédita, sem a suavização de Laplace, o produto das verosimilhanças seria nulo ($P(\text{Gene}=\text{BRCA1}|C)=0$), provocando uma falha de cálculo. Com o parâmetro $\alpha = 1$, a verosimilhança fallback foi corretamente calculada e o modelo conseguiu classificar com sucesso a amostra baseando-se nas restantes características da mutação (como a Consequência clínica). Isto comprova a robustez e estabilidade do Naïve Bayes em oncologia para variantes raras.
+
+\section*{Conclusão}
+Este projeto consolidou a aplicação prática de métodos probabilísticos em problemas complexos da área da saúde. A implementação demonstrou a eficácia da combinação entre algoritmos de eficiência (Bloom e MinHash) e de inferência estatística (Naïve Bayes). A avaliação experimental validou a precisão dos modelos sob condições controladas, destacando a importância da suavização de Laplace e do ajuste de parâmetros de hashing para garantir resultados fidedignos em contextos oncológicos.
+
+\end{document}

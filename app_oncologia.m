@@ -1,5 +1,5 @@
 % app_oncologia.m
-% Interface Grafica do MinHash
+% Interface Grafica do Pipeline de Triagem Clinico-Oncologica - MPEI
 
 function app_oncologia()
     addpath('utils');
@@ -8,30 +8,45 @@ function app_oncologia()
     dados_teste = [];
     assinaturas_treino = [];
     minhash = [];
+    filtro_bloom = [];
+    nb = [];
     
     fig = uifigure('Name', 'Sistema de Triagem Clinico-Oncologica - MPEI', ...
         'Position', [100 100 800 620]);
     
-    % Componentes UI
+    % 1. Carregamento de Dados e Treino
     pnlControl = uipanel(fig, 'Title', '1. Carregamento de Dados e Treino', 'Position', [20 500 760 100]);
     lblStatus = uilabel(pnlControl, 'Text', 'Estado: Aguardando carregamento...', 'Position', [20 40 400 22], 'FontWeight', 'bold');
-    btnLoad = uibutton(pnlControl, 'Text', 'Carregar ClinVar e Treinar MinHash', ...
+    btnLoad = uibutton(pnlControl, 'Text', 'Carregar ClinVar e Treinar Modelos', ...
         'Position', [450 30 280 35], 'ButtonPushedFcn', @(btn, event) carregarETreinar(), ...
         'BackgroundColor', [0.1 0.5 0.8], 'FontColor', [1 1 1], 'FontWeight', 'bold');
         
+    % 2. Selecionar Paciente de Teste
     pnlPaciente = uipanel(fig, 'Title', '2. Selecionar Paciente de Teste', 'Position', [20 280 760 200]);
     uilabel(pnlPaciente, 'Text', 'Escolha um Paciente do Conjunto de Teste:', 'Position', [20 145 300 22]);
     ddPacientes = uidropdown(pnlPaciente, 'Position', [20 115 720 25], 'Items', {'(Carregue os dados primeiro)'}, 'Enable', 'off', ...
         'ValueChangedFcn', @(dd, event) atualizarDetalhesPaciente());
     lblDetalhes = uilabel(pnlPaciente, 'Text', 'Detalhes do paciente selecionado aparecerao aqui.', 'Position', [20 15 720 85], 'WordWrap', 'on', 'FontAngle', 'italic');
     
-    pnlResultados = uipanel(fig, 'Title', '3. Resultados da Comparacao MinHash', 'Position', [20 20 760 240]);
-    btnComparar = uibutton(pnlResultados, 'Text', 'Executar Comparacao MinHash', ...
-        'Position', [20 175 240 30], 'Enable', 'off', 'ButtonPushedFcn', @(btn, event) executarMinHash(), ...
+    % 3. Resultados do Pipeline
+    pnlResultados = uipanel(fig, 'Title', '3. Resultados do Pipeline Integrado', 'Position', [20 20 760 240]);
+    btnComparar = uibutton(pnlResultados, 'Text', 'Executar Pipeline Completo', ...
+        'Position', [20 180 240 32], 'Enable', 'off', 'ButtonPushedFcn', @(btn, event) executarPipeline(), ...
         'BackgroundColor', [0.1 0.7 0.4], 'FontColor', [1 1 1], 'FontWeight', 'bold');
-    tblResultados = uitable(pnlResultados, 'Position', [20 20 720 150]);
-    tblResultados.ColumnName = {'Rank', 'Similaridade Jaccard', 'Gene', 'Mutacao (REF>ALT)', 'Significancia Clinica'};
-    tblResultados.ColumnWidth = {60, 140, 120, 140, 'auto'};
+        
+    % Sub-paineis esquerdos (Bloom e Naive Bayes)
+    pnlBloom = uipanel(pnlResultados, 'Title', 'Filtro de Bloom (Triagem)', 'Position', [20 100 320 70]);
+    lblBloomVal = uilabel(pnlBloom, 'Text', 'Aguardando execucao...', 'Position', [10 10 300 30], ...
+        'HorizontalAlignment', 'center', 'FontWeight', 'bold');
+        
+    pnlNB = uipanel(pnlResultados, 'Title', 'Naive Bayes (Diagnostico)', 'Position', [20 20 320 70]);
+    lblNBVal = uilabel(pnlNB, 'Text', 'Aguardando execucao...', 'Position', [10 10 300 30], ...
+        'HorizontalAlignment', 'center', 'FontWeight', 'bold');
+        
+    % Tabela de Resultados (MinHash)
+    tblResultados = uitable(pnlResultados, 'Position', [350 20 390 180]);
+    tblResultados.ColumnName = {'Rank', 'Similaridade', 'Gene', 'Classe Historica'};
+    tblResultados.ColumnWidth = {50, 90, 80, 140};
     
     % Callbacks
     function carregarETreinar()
@@ -47,18 +62,35 @@ function app_oncologia()
                 load(dados_mat, 'dados_treino', 'dados_teste');
             end
             
-            lblStatus.Text = 'A gerar assinaturas MinHash...';
+            dados_treino(dados_treino.CLNSIG == "" | ismissing(dados_treino.CLNSIG), :) = [];
+            dados_teste(dados_teste.CLNSIG == "" | ismissing(dados_teste.CLNSIG), :) = [];
+            
+            lblStatus.Text = 'A treinar modelos...';
             drawnow;
             
+            % 1. Inicializar e Treinar Filtro de Bloom
+            n_high_risk = sum(dados_treino.is_high_risk);
+            m_bloom = max(1000, round(8 * n_high_risk));
+            k_bloom = 5;
+            filtro_bloom = FiltroBloom(m_bloom, k_bloom);
+            chaves_alto_risco = dados_treino.variant_key(dados_treino.is_high_risk);
+            for i = 1:numel(chaves_alto_risco)
+                filtro_bloom.Inserir(chaves_alto_risco(i));
+            end
+            
+            % 2. Inicializar e Treinar MinHash
             numHashes = 150;
             shingleSize = 5;
             minhash = MinHash(numHashes, shingleSize, 42);
-            
             n_treino = height(dados_treino);
             assinaturas_treino = zeros(n_treino, numHashes, 'uint64');
             for i = 1:n_treino
                 assinaturas_treino(i, :) = minhash.gerarAssinatura(char(dados_treino.Perfil(i)));
             end
+            
+            % 3. Inicializar e Treinar Naive Bayes
+            nb = NaiveBayes(1);
+            nb.treinar(dados_treino, 'CLNSIG', {'Gene', 'CHROM', 'REF', 'ALT', 'Consequence'});
             
             lblStatus.Text = sprintf('Dados Carregados! Treino Concluido (%d amostras)', n_treino);
             
@@ -92,16 +124,44 @@ function app_oncologia()
         lblDetalhes.Interpreter = 'html'; 
     end
 
-    function executarMinHash()
-        if isempty(dados_teste) || isempty(minhash), return; end
+    function executarPipeline()
+        if isempty(dados_teste) || isempty(minhash) || isempty(filtro_bloom) || isempty(nb), return; end
         
         idx_selecionado = ddPacientes.Value;
         idx_partes = sscanf(idx_selecionado, 'Paciente %d:');
         idx_paciente = idx_partes(1);
         
         paciente = dados_teste(idx_paciente, :);
-        perfil_novo = char(paciente.Perfil);
         
+        % 1. Filtro de Bloom (Triagem)
+        isRisk = filtro_bloom.Verificar(paciente.variant_key);
+        if isRisk
+            lblBloomVal.Text = 'ALERTA: Variante de Risco!';
+            lblBloomVal.BackgroundColor = [1 0.3 0.3];
+            lblBloomVal.FontColor = [1 1 1];
+        else
+            lblBloomVal.Text = 'Sem perigo conhecido no Bloom';
+            lblBloomVal.BackgroundColor = [0.4 0.8 0.4];
+            lblBloomVal.FontColor = [0 0 0];
+        end
+        
+        % 2. Naive Bayes (Diagnostico)
+        [classe, confianca, ~] = nb.classificar(paciente);
+        lblNBVal.Text = sprintf('%s (%.1f%%)', classe, confianca * 100);
+        
+        if contains(lower(classe), 'pathogenic')
+            lblNBVal.BackgroundColor = [1 0.6 0.2];
+            lblNBVal.FontColor = [1 1 1];
+        elseif contains(lower(classe), 'benign')
+            lblNBVal.BackgroundColor = [0.7 0.9 0.7];
+            lblNBVal.FontColor = [0 0 0];
+        else
+            lblNBVal.BackgroundColor = [0.9 0.9 0.9];
+            lblNBVal.FontColor = [0 0 0];
+        end
+        
+        % 3. MinHash (Semelhancas)
+        perfil_novo = char(paciente.Perfil);
         assinatura_novo = minhash.gerarAssinatura(perfil_novo);
         
         n_treino = height(dados_treino);
@@ -110,18 +170,17 @@ function app_oncologia()
             similaridades(j) = minhash.estimarJaccard(assinatura_novo, assinaturas_treino(j, :));
         end
         
-        [valores_sim, indices_top] = maxk(similaridades, 3);
+        [valores_sim, indices_top] = maxk(similaridades, 5);
         
-        data = cell(3, 5);
-        for k = 1:3
+        data = cell(5, 4);
+        for k = 1:5
             idx_hist = indices_top(k);
             paciente_hist = dados_treino(idx_hist, :);
             
             data{k, 1} = sprintf('Top %d', k);
             data{k, 2} = sprintf('%.1f%%', valores_sim(k) * 100);
             data{k, 3} = char(paciente_hist.Gene);
-            data{k, 4} = sprintf('%s > %s', paciente_hist.REF, paciente_hist.ALT);
-            data{k, 5} = char(paciente_hist.CLNSIG);
+            data{k, 4} = char(paciente_hist.CLNSIG);
         end
         tblResultados.Data = data;
     end
