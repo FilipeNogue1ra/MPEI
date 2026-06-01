@@ -1,3 +1,4 @@
+% !TEX root = relatorio_oncologia.tex
 \documentclass[11pt,a4paper]{article}
 \usepackage[utf8]{inputenc}
 \usepackage[portuguese]{babel}
@@ -31,7 +32,7 @@
     
     \vfill
     
-    {\large Professor das Aulas Teóricas: \par António Joaquim da Silva Teixeira (ajst@ua.pt) \par}
+    {\large Professor Regente: \par António Joaquim da Silva Teixeira (ajst@ua.pt) \par}
     
     \vspace*{1cm}
 \end{titlepage}
@@ -118,7 +119,7 @@ Nos testes empíricos, os resultados obtidos foram:
 \end{figure}
 
 \noindent\textbf{Conclusão} \\
-Os testes demonstram que a taxa empírica converge de forma muito precisa para a taxa teórica de $3.06\%$. Isto prova que as funções de dispersão (hash) baseadas no algoritmo djb2 distribuem os dados uniformemente pelo vetor de bits. Para reduzir as colisões/falsos positivos em ambiente clínico real, o tamanho $m$ do filtro deve ser aumentado.
+Os testes demonstram que a taxa empírica converge de forma muito precisa para a taxa teórica de $3.06\%$. Isto prova que as funções de dispersão (hash) baseadas no algoritmo djb2 distribuem os dados uniformemente pelo intervalo do vetor de bits. Para reduzir as colisões/falsos positivos em ambiente clínico real, o tamanho $m$ do filtro deve ser aumentado.
 
 \subsection*{Módulo 2 - MinHash (teste\_minhash.m)}
 Para testar a estimativa de similaridade de Jaccard do MinHash, definimos duas strings representativas de perfis genéticos com uma interseção conhecida de palavras.
@@ -160,6 +161,12 @@ Treinámos o classificador e testámos a previsão para dois cenários:
     \item \textbf{Variante inédita (Gene desconhecido):} Onde se inseriu o gene \textit{BRCA1} (inexistente no treino).
 \end{enumerate}
 
+\vspace{0.5cm}
+\noindent\textbf{Resultados e Conclusão} \\
+Para a variante inédita, sem a suavização de Laplace, o produto das verosimilhanças seria nulo ($P(\text{Gene}=\text{BRCA1}|C)=0$), provocando uma falha de cálculo. Com o parâmetro $\alpha = 1$, a verosimilhança fallback foi corretamente calculada e o modelo conseguiu classificar com sucesso a amostra baseando-se nas restantes características da mutação (como a Consequência clínica). Isto comprova a robustez e estabilidade do Naïve Bayes para variantes raras.
+
+Além disso, notou-se um grande desequilíbrio nos dados do ClinVar, onde a classe \textit{Likely\_benign} representa a esmagadora maioria dos registos. Esta diferença afeta as decisões do modelo, fazendo com que ele escolha quase sempre a classe com mais exemplos (o que explica a alta taxa de acerto de $87.80\%$ na \textit{Likely\_benign}, enquanto as classes mais raras ficam com $0\%$). Para resolver este problema no futuro, podemos reduzir a quantidade de dados da classe maior (\textit{undersampling}), aumentar os dados das classes mais pequenas (\textit{oversampling}) ou equilibrar as probabilidades iniciais do modelo. Assim, o modelo será mais capaz de detetar as variantes que causam doenças graves.
+
 \begin{figure}[htbp]
   \centering
   \begin{minipage}{0.48\textwidth}
@@ -176,12 +183,6 @@ Treinámos o classificador e testámos a previsão para dois cenários:
     \label{fig:nb-confusion}
   \end{minipage}
 \end{figure}
-
-\vspace{0.5cm}
-\noindent\textbf{Resultados e Conclusão} \\
-Para a variante inédita, sem a suavização de Laplace, o produto das verosimilhanças seria nulo ($P(\text{Gene}=\text{BRCA1}|C)=0$), provocando uma falha de cálculo. Com o parâmetro $\alpha = 1$, a verosimilhança fallback foi corretamente calculada e o modelo conseguiu classificar com sucesso a amostra baseando-se nas restantes características da mutação (como a Consequência clínica). Isto comprova a robustez e estabilidade do Naïve Bayes em oncologia para variantes raras.
-
-Além disso, notou-se um grande desequilíbrio nos dados do ClinVar, onde a classe \textit{Likely\_benign} representa a esmagadora maioria dos registos. Esta diferença afeta as decisões do modelo, fazendo com que ele escolha quase sempre a classe com mais exemplos (o que explica a alta taxa de acerto de $87.80\%$ na \textit{Likely\_benign}, enquanto as classes mais raras ficam com $0\%$). Para resolver este problema no futuro, podemos reduzir a quantidade de dados da classe maior (\textit{undersampling}), aumentar os dados das classes mais pequenas (\textit{oversampling}) ou equilibrar as probabilidades iniciais do modelo. Assim, o modelo será mais capaz de detetar as variantes que causam doenças graves.
 
 \subsection*{Análise de Eficiência Temporal}
 Para demonstrar a viabilidade clínica e a escalabilidade do sistema em tempo real, os tempos de execução do treino e da inferência foram medidos com as funções \texttt{tic} e \texttt{toc} do MatLab. O processo completo de treino dos três modelos probabilísticos (sobre 4.000 variantes genómicas) demorou apenas \textbf{0.9665 segundos}. Os tempos médios observados por consulta em fase de inferência estão sumariados na tabela seguinte:

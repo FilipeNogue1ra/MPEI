@@ -12,24 +12,27 @@ function app_oncologia()
     nb = [];
     
     fig = uifigure('Name', 'Sistema de Triagem Clinico-Oncologica - MPEI', ...
-        'Position', [100 100 800 620]);
+        'Position', [100 100 800 680]);
     
     % 1. Carregamento de Dados e Treino
-    pnlControl = uipanel(fig, 'Title', '1. Carregamento de Dados e Treino', 'Position', [20 500 760 100]);
+    pnlControl = uipanel(fig, 'Title', '1. Carregamento de Dados e Treino', 'Position', [20 530 760 100]);
     lblStatus = uilabel(pnlControl, 'Text', 'Estado: Aguardando carregamento...', 'Position', [20 40 400 22], 'FontWeight', 'bold');
     btnLoad = uibutton(pnlControl, 'Text', 'Carregar ClinVar e Treinar Modelos', ...
         'Position', [450 30 280 35], 'ButtonPushedFcn', @(btn, event) carregarETreinar(), ...
         'BackgroundColor', [0.1 0.5 0.8], 'FontColor', [1 1 1], 'FontWeight', 'bold');
+    btnSair = uibutton(fig, 'Text', 'Sair', ...
+        'Position', [690 10 80 28], 'ButtonPushedFcn', @(btn, event) close(fig), ...
+        'BackgroundColor', [0.85 0.2 0.2], 'FontColor', [1 1 1], 'FontWeight', 'bold');
         
     % 2. Selecionar Paciente de Teste
-    pnlPaciente = uipanel(fig, 'Title', '2. Selecionar Paciente de Teste', 'Position', [20 280 760 200]);
+    pnlPaciente = uipanel(fig, 'Title', '2. Selecionar Paciente de Teste', 'Position', [20 310 760 200]);
     uilabel(pnlPaciente, 'Text', 'Escolha um Paciente do Conjunto de Teste:', 'Position', [20 145 300 22]);
     ddPacientes = uidropdown(pnlPaciente, 'Position', [20 115 720 25], 'Items', {'(Carregue os dados primeiro)'}, 'Enable', 'off', ...
         'ValueChangedFcn', @(dd, event) atualizarDetalhesPaciente());
     lblDetalhes = uilabel(pnlPaciente, 'Text', 'Detalhes do paciente selecionado aparecerao aqui.', 'Position', [20 15 720 85], 'WordWrap', 'on', 'FontAngle', 'italic');
     
     % 3. Resultados do Pipeline
-    pnlResultados = uipanel(fig, 'Title', '3. Resultados do Pipeline Integrado', 'Position', [20 20 760 240]);
+    pnlResultados = uipanel(fig, 'Title', '3. Resultados do Pipeline Integrado', 'Position', [20 50 760 240]);
     btnComparar = uibutton(pnlResultados, 'Text', 'Executar Pipeline Completo', ...
         'Position', [20 180 240 32], 'Enable', 'off', 'ButtonPushedFcn', @(btn, event) executarPipeline(), ...
         'BackgroundColor', [0.1 0.7 0.4], 'FontColor', [1 1 1], 'FontWeight', 'bold');
@@ -47,6 +50,8 @@ function app_oncologia()
     tblResultados = uitable(pnlResultados, 'Position', [350 20 390 180]);
     tblResultados.ColumnName = {'Rank', 'Similaridade', 'Gene', 'Classe Historica'};
     tblResultados.ColumnWidth = {50, 90, 80, 140};
+
+    uistack(btnSair, 'top');
     
     % Callbacks
     function carregarETreinar()
@@ -119,8 +124,15 @@ function app_oncologia()
         idx_paciente = idx_partes(1);
         
         paciente = dados_teste(idx_paciente, :);
+        gene = char(string(paciente.Gene));
+        chrom = char(string(paciente.CHROM));
+        ref = char(string(paciente.REF));
+        alt = char(string(paciente.ALT));
+        consequence = char(string(paciente.Consequence));
+        clnsig = char(string(paciente.CLNSIG));
+        perfil = char(string(paciente.Perfil));
         lblDetalhes.Text = sprintf('<b>Gene:</b> %s | <b>Cromossoma:</b> %s | <b>Mutacao:</b> %s > %s | <b>Consequencia:</b> %s<br><b>Significancia Clinica Real:</b> %s<br><b>Perfil:</b> %s', ...
-            paciente.Gene, paciente.CHROM, paciente.REF, paciente.ALT, paciente.Consequence, paciente.CLNSIG, paciente.Perfil);
+            gene, chrom, ref, alt, consequence, clnsig, perfil);
         lblDetalhes.Interpreter = 'html'; 
      end
 
